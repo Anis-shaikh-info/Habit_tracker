@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Habit Compass | Private Login + Monthly Reports & Goal Deadlines</title>
+  <!-- Tailwind CSS + Font Awesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    body { background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); font-family: 'Inter', system-ui, sans-serif; }
+    .card-hover { transition: all 0.2s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 12px 20px -12px rgba(0,0,0,0.15); }
+    .goal-progress-bar { height: 6px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
+    .goal-progress-fill { height: 100%; background: #4f46e5; width: 0%; transition: width 0.2s; }
+    .modal-bg { background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
+    .login-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN / REGISTER SCREEN (hidden after login) -->
+<div id="loginScreen" class="fixed inset-0 bg-indigo-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8">
+    <div class="text-center mb-6">
+      <i class="fas fa-lock text-indigo-600 text-4xl mb-2"></i>
+      <h2 class="text-2xl font-bold text-gray-800">Habit Compass</h2>
+      <p class="text-gray-500 text-sm">Your private space — login to continue</p>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+        <input type="text" id="loginUsername" placeholder="e.g., ahmad, fatima" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password (optional, for demo)</label>
+        <input type="password" id="loginPassword" placeholder="any password or leave blank" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+      </div>
+      <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2"><i class="fas fa-sign-in-alt"></i> Login / Register</button>
+      <p class="text-xs text-gray-400 text-center mt-3">Data is stored locally per username. Each person gets full privacy.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="mainApp" class="hidden p-4 md:p-6 max-w-7xl mx-auto">
+  <!-- Header with logout & user -->
+  <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
+    <div>
+      <h1 class="text-3xl font-extrabold bg-gradient-to-r from-indigo-800 to-indigo-600 bg-clip-text text-transparent"><i class="fas fa-chart-line text-indigo-500 mr-2"></i>Habit Compass</h1>
+      <p class="text-gray-500 text-sm">wake · salah · gym · work + goal deadlines & monthly reports</p>
+    </div>
+    <div class="flex gap-3 items-center">
+      <span id="userBadge" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium"><i class="fas fa-user-circle"></i> <span id="currentUsername"></span></span>
+      <button id="logoutBtn" class="bg-white/80 border border-gray-300 text-gray-700 px-4 py-2 rounded-xl hover:bg-gray-100 transition flex items-center gap-2 text-sm"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      <button id="clearAllDataBtn" class="bg-white/80 border border-red-200 text-red-600 px-4 py-2 rounded-xl hover:bg-red-50 transition text-sm"><i class="fas fa-trash-alt"></i> Reset my data</button>
+    </div>
+  </div>
+
+  <!-- Main Grid: Daily Entry + Recent & Monthly Report -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- LEFT: Daily Habit Entry -->
+    <div class="lg:col-span-2 space-y-5">
+      <!-- Date picker -->
+      <div class="bg-white rounded-2xl shadow-md p-5 border card-hover">
+        <div class="flex flex-wrap justify-between items-center gap-3">
+          <div class="flex items-center gap-3"><i class="fas fa-calendar-alt text-indigo-500 text-xl"></i><span class="font-semibold">Track for:</span><input type="date" id="trackDate" class="border rounded-xl px-3 py-2 bg-gray-50"></div>
+          <div class="flex gap-2"><button id="todayBtn" class="text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl text-sm"><i class="far fa-sun"></i> Today</button><button id="deleteEntryBtn" class="text-red-600 bg-red-50 px-3 py-1.5 rounded-xl text-sm"><i class="fas fa-trash"></i> Delete</button></div>
+        </div>
+      </div>
+      <!-- Wake & Sleep -->
+      <div class="bg-white rounded-2xl shadow-md p-5 border">
+        <div class="flex items-center gap-2 border-b pb-2 mb-4"><i class="fas fa-bed text-indigo-400 text-xl"></i><h2 class="text-xl font-bold">🌙 Wake → Sleep</h2></div>
+        <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm text-gray-600">Wake up</label><input type="time" id="wakeTime" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50"></div><div><label class="block text-sm text-gray-600">Sleep time</label><input type="time" id="sleepTime" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50"></div></div>
+        <div class="mt-3 text-sm text-gray-500"><i class="fas fa-hourglass-half text-indigo-400"></i> Awake duration: <span id="durationDisplay" class="font-semibold text-indigo-700">—</span></div>
+      </div>
+      <!-- Prayers -->
+      <div class="bg-white rounded-2xl shadow-md p-5 border">
+        <div class="flex items-center gap-2 border-b pb-2 mb-3"><i class="fas fa-mosque text-emerald-600 text-xl"></i><h2 class="text-xl font-bold">🕌 5 Times Namaj</h2></div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl cursor-pointer"><input type="checkbox" id="prayerFajr" class="w-5 h-5"> <span>Fajr</span></label>
+          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl cursor-pointer"><input type="checkbox" id="prayerDhuhr"> <span>Dhuhr</span></label>
+          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl cursor-pointer"><input type="checkbox" id="prayerAsr"> <span>Asr</span></label>
+          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl cursor-pointer"><input type="checkbox" id="prayerMaghrib"> <span>Maghrib</span></label>
+          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl cursor-pointer"><input type="checkbox" id="prayerIsha"> <span>Isha</span></label>
+        </div>
+        <div class="mt-2 text-right text-xs text-gray-400" id="prayerCountPreview">0/5 completed</div>
+      </div>
+      <!-- Gym -->
+      <div class="bg-white rounded-2xl shadow-md p-5 border">
+        <div class="flex items-center gap-2 border-b pb-2 mb-4"><i class="fas fa-dumbbell text-orange-500 text-xl"></i><h2 class="text-xl font-bold">💪 Gym & Workout</h2></div>
+        <div class="space-y-3"><input type="text" id="gymTime" placeholder="⏱️ Workout time (e.g., 6-7 PM)" class="w-full border rounded-xl px-4 py-2.5"><input type="text" id="gymExercises" placeholder="🏋️ Exercises (comma separated)" class="w-full border rounded-xl px-4 py-2.5"><input type="text" id="gymBodyPart" placeholder="🎯 Body part(s)" class="w-full border rounded-xl px-4 py-2.5"></div>
+      </div>
+      <!-- Work Schedule -->
+      <div class="bg-white rounded-2xl shadow-md p-5 border">
+        <div class="flex items-center gap-2 border-b pb-2 mb-3"><i class="fas fa-briefcase text-sky-600 text-xl"></i><h2 class="text-xl font-bold">📋 Daily Work Schedule</h2></div>
+        <textarea id="workSchedule" rows="2" class="w-full border rounded-xl px-4 py-2.5" placeholder="Tasks, meetings, priorities..."></textarea>
+      </div>
+      <!-- Save / Clear -->
+      <div class="flex gap-3 sticky bottom-4 bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-lg border"><button id="saveEntryBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl flex-1 flex items-center justify-center gap-2"><i class="fas fa-save"></i> Save Day</button><button id="clearFormBtn" class="bg-gray-200 hover:bg-gray-300 px-5 rounded-xl"><i class="fas fa-eraser"></i> Clear</button></div>
+    </div>
+
+    <!-- RIGHT PANEL: Stats + Recent + Monthly Report -->
+    <div class="space-y-5">
+      <!-- Quick stats -->
+      <div class="bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-5 border">
+        <h3 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-chart-simple text-indigo-500"></i> Quick glance</h3>
+        <div class="mt-3 grid grid-cols-2 gap-3 text-center"><div class="bg-white p-2 rounded-xl"><p class="text-xs text-gray-500">Avg. Prayer/week</p><p id="avgPrayerStat" class="text-2xl font-bold text-indigo-700">0</p></div><div class="bg-white p-2 rounded-xl"><p class="text-xs text-gray-500">Gym days (7d)</p><p id="gymDaysStat" class="text-2xl font-bold text-orange-600">0</p></div></div>
+      </div>
+      <!-- Monthly Report Selector & Display -->
+      <div class="bg-white rounded-2xl shadow-md p-5 border">
+        <div class="flex justify-between items-center flex-wrap gap-2"><h3 class="font-bold text-lg"><i class="fas fa-calendar-alt text-purple-600"></i> Monthly Achievement</h3><div class="flex gap-2"><input type="month" id="reportMonth" class="border rounded-lg px-2 py-1 text-sm"><button id="loadReportBtn" class="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm"><i class="fas fa-chart-bar"></i> Show</button></div></div>
+        <div id="monthlyReportContent" class="mt-3 text-sm space-y-2 max-h-60 overflow-y-auto bg-gray-50 p-3 rounded-xl"><p class="text-gray-400">Select a month to see your achievements.</p></div>
+      </div>
+      <!-- Recent Entries -->
+      <div class="bg-white rounded-2xl shadow-md p-5 border">
+        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-lg"><i class="fas fa-history"></i> Recent days</h3><span class="text-xs text-gray-400">click to load</span></div>
+        <div id="recentList" class="space-y-3 max-h-96 overflow-y-auto pr-1"><div class="text-center text-gray-400 py-6">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM GOALS SECTION (with deadline & monthly integration) -->
+  <div class="mt-10 bg-white rounded-2xl shadow-xl border border-indigo-100 overflow-hidden">
+    <div class="bg-indigo-50 px-6 py-4 flex flex-wrap justify-between items-center gap-3"><div><h2 class="text-2xl font-bold text-indigo-800"><i class="fas fa-bullseye"></i> Custom Goals (Time-Frame + Deadlines)</h2><p class="text-gray-600 text-sm">Set a goal with total days → automatic end date & daily tasks</p></div><button id="openGoalModalBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl shadow flex items-center gap-2"><i class="fas fa-plus-circle"></i> New Goal</button></div>
+    <div id="goalsContainer" class="p-6 space-y-6 max-h-[600px] overflow-y-auto"><div class="text-center text-gray-400 py-10">Loading goals...</div></div>
+  </div>
+</div>
+
+<!-- Goal Creation Modal -->
+<div id="goalModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+  <div class="bg-white rounded-2xl max-w-lg w-full mx-4 p-6 shadow-2xl"><div class="flex justify-between items-center border-b pb-3 mb-4"><h3 class="text-xl font-bold"><i class="fas fa-flag-checkered text-indigo-600"></i> Create Goal with Deadline</h3><button id="closeModalBtn" class="text-gray-400 text-2xl">&times;</button></div>
+    <div class="space-y-4"><div><label>Goal name *</label><input type="text" id="goalName" placeholder="e.g., Learn Python in 30 Days" class="w-full border rounded-xl px-4 py-2"></div><div><label>Total days (time frame)</label><input type="number" id="goalDays" min="1" max="365" value="30" class="w-full border rounded-xl px-4 py-2"></div><div><label>Start date</label><input type="date" id="goalStartDate" class="w-full border rounded-xl px-4 py-2"></div><div class="text-xs text-gray-500">End date will be calculated automatically. Daily tasks will be generated.</div><button id="confirmCreateGoal" class="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-xl">Create Goal</button></div></div>
+</div>
+
+<!-- Toast -->
+<div id="toastMsg" class="fixed bottom-6 right-6 bg-gray-900 text-white px-5 py-2 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50"></div>
+
+<script>
+  // ======================== USER MANAGEMENT ========================
+  let currentUser = null;
+  const USERS_PREFIX = "habit_user_";
+
+  function storageKeyForUser(user, suffix) { return `${USERS_PREFIX}${user}_${suffix}`; }
+  function saveUserData(user, dataType, value) { localStorage.setItem(storageKeyForUser(user, dataType), JSON.stringify(value)); }
+  function loadUserData(user, dataType, defaultValue = null) { const raw = localStorage.getItem(storageKeyForUser(user, dataType)); if(raw) try { return JSON.parse(raw); } catch(e) { return defaultValue; } return defaultValue; }
+
+  function login(username, password) { if(!username.trim()) { showToast("Enter username", true); return false; } currentUser = username.trim(); localStorage.setItem("last_logged_user", currentUser); return true; }
+  function logout() { currentUser = null; document.getElementById("mainApp").classList.add("hidden"); document.getElementById("loginScreen").classList.remove("hidden"); document.getElementById("loginUsername").value = ""; }
+  function resetCurrentUserData() { if(!currentUser) return; if(confirm(`Delete ALL data for user "${currentUser}"? This includes habits, goals, reports.`)) { const keysToRemove = []; for(let i=0;i<localStorage.length;i++) { let k = localStorage.key(i); if(k && k.startsWith(USERS_PREFIX + currentUser + "_")) keysToRemove.push(k); } keysToRemove.forEach(k => localStorage.removeItem(k)); showToast(`All data for ${currentUser} deleted`); location.reload(); } }
+
+  // ======================== HABIT TRACKING (per user) ========================
+  let habitEntriesCache = null; // not needed but functions will use load/save per day
+  function getHabitKey(dateStr) { return `habit_${dateStr}`; }
+  function saveHabitEntry(dateStr, data) { if(!currentUser) return; saveUserData(currentUser, getHabitKey(dateStr), data); }
+  function loadHabitEntry(dateStr) { return loadUserData(currentUser, getHabitKey(dateStr), null); }
+  function getAllHabitEntries() { let entries = []; for(let i=0;i<localStorage.length;i++) { let k = localStorage.key(i); if(k && k.startsWith(`${USERS_PREFIX}${currentUser}_habit_`)) { let datePart = k.replace(`${USERS_PREFIX}${currentUser}_habit_`, ""); if(datePart.match(/^\d{4}-\d{2}-\d{2}$/)) { let data = loadUserData(currentUser, `habit_${datePart}`, null); if(data) entries.push({date: datePart, data}); } } } entries.sort((a,b)=>a.date.localeCompare(b.date)); return entries; }
+
+  // DOM habit elements
+  const dateInput = document.getElementById('trackDate'), wakeTime = document.getElementById('wakeTime'), sleepTime = document.getElementById('sleepTime'), durationSpan = document.getElementById('durationDisplay');
+  const prayerFajr = document.getElementById('prayerFajr'), prayerDhuhr = document.getElementById('prayerDhuhr'), prayerAsr = document.getElementById('prayerAsr'), prayerMaghrib = document.getElementById('prayerMaghrib'), prayerIsha = document.getElementById('prayerIsha');
+  const gymTime = document.getElementById('gymTime'), gymExercises = document.getElementById('gymExercises'), gymBodyPart = document.getElementById('gymBodyPart'), workSchedule = document.getElementById('workSchedule');
+  const prayerCountSpan = document.getElementById('prayerCountPreview');
+  const saveBtn = document.getElementById('saveEntryBtn'), clearFormBtn = document.getElementById('clearFormBtn'), deleteEntryBtn = document.getElementById('deleteEntryBtn'), clearAllDataBtn = document.getElementById('clearAllDataBtn'), todayBtn = document.getElementById('todayBtn');
+  const recentListDiv = document.getElementById('recentList'), avgPrayerStat = document.getElementById('avgPrayerStat'), gymDaysStat = document.getElementById('gymDaysStat');
+
+  function computeDuration(wake, sleep) { if(!wake||!sleep) return null; const [wh,wm]=wake.split(':').map(Number); let [sh,sm]=sleep.split(':').map(Number); let wt=wh*60+wm; let st=sh*60+sm; if(st<wt) st+=1440; let diff=st-wt; return {hours:Math.floor(diff/60), mins:diff%60}; }
+  function updateDurationDisplay() { let d=computeDuration(wakeTime.value, sleepTime.value); durationSpan.innerText = d?`${d.hours}h ${d.mins}m`:(wakeTime.value&&sleepTime.value?'⚠️ invalid':'—'); }
+  function updatePrayerCount() { let c=[prayerFajr,prayerDhuhr,prayerAsr,prayerMaghrib,prayerIsha].filter(cb=>cb.checked).length; prayerCountSpan.innerText=`${c}/5 completed`; }
+  function getCurrentFormData() { return { wakeTime:wakeTime.value, sleepTime:sleepTime.value, prayers:{fajr:prayerFajr.checked,dhuhr:prayerDhuhr.checked,asr:prayerAsr.checked,maghrib:prayerMaghrib.checked,isha:prayerIsha.checked}, gym:{workoutTime:gymTime.value, exercises:gymExercises.value, bodyPart:gymBodyPart.value}, workSchedule:workSchedule.value, updatedAt:new Date().toISOString() }; }
+  function populateForm(data) { wakeTime.value=data.wakeTime||''; sleepTime.value=data.sleepTime||''; prayerFajr.checked=data.prayers?.fajr||false; prayerDhuhr.checked=data.prayers?.dhuhr||false; prayerAsr.checked=data.prayers?.asr||false; prayerMaghrib.checked=data.prayers?.maghrib||false; prayerIsha.checked=data.prayers?.isha||false; gymTime.value=data.gym?.workoutTime||''; gymExercises.value=data.gym?.exercises||''; gymBodyPart.value=data.gym?.bodyPart||''; workSchedule.value=data.workSchedule||''; updateDurationDisplay(); updatePrayerCount(); }
+  function clearForm() { wakeTime.value=''; sleepTime.value=''; [prayerFajr,prayerDhuhr,prayerAsr,prayerMaghrib,prayerIsha].forEach(cb=>cb.checked=false); gymTime.value=''; gymExercises.value=''; gymBodyPart.value=''; workSchedule.value=''; updateDurationDisplay(); updatePrayerCount(); }
+  function saveCurrentEntry() { let date=dateInput.value; if(!date) return showToast("Select date",true); saveHabitEntry(date, getCurrentFormData()); showToast(`Saved ${date}`); renderRecentEntries(); updateStats(); }
+  function loadEntryForDate(date) { let data=loadHabitEntry(date); if(data) { populateForm(data); showToast(`Loaded ${date}`); } else { clearForm(); showToast(`No entry for ${date}`, false); } }
+  function deleteCurrentEntry() { let date=dateInput.value; if(date && loadHabitEntry(date)) { saveHabitEntry(date, null); clearForm(); showToast(`Deleted ${date}`); renderRecentEntries(); updateStats(); } else showToast("No entry",true); }
+  function renderRecentEntries() { let entries=getAllHabitEntries().reverse().slice(0,12); if(!entries.length) { recentListDiv.innerHTML='<div class="text-center text-gray-400 py-6">No entries yet.</div>'; return; } let html=''; entries.forEach(e=>{ let pCount=Object.values(e.data.prayers||{}).filter(v=>v).length; let gymInfo=e.data.gym?.workoutTime||(e.data.gym?.exercises?'✓':'—'); html+=`<div class="recent-card bg-gray-50 p-3 rounded-xl hover:shadow cursor-pointer" data-date="${e.date}"><div><div class="font-bold text-indigo-800 text-sm">${e.date}</div><div class="text-xs text-gray-500">🌙 ${e.data.wakeTime||'—'} → ${e.data.sleepTime||'—'} · 🕌 ${pCount}/5</div><div class="text-xs">💪 ${gymInfo} · 📋 ${(e.data.workSchedule||'').substring(0,25)}</div></div></div>`; }); recentListDiv.innerHTML=html; document.querySelectorAll('.recent-card').forEach(card=>{ card.addEventListener('click',()=>{ let d=card.getAttribute('data-date'); if(d){ dateInput.value=d; loadEntryForDate(d); } }); }); }
+  function updateStats() { let entries=getAllHabitEntries(); let today=new Date(); today.setHours(0,0,0,0); let sevenDaysAgo=new Date(today); sevenDaysAgo.setDate(today.getDate()-6); let last7=entries.filter(e=>new Date(e.date)>=sevenDaysAgo); let totalPrayers=0, gymDays=0; last7.forEach(e=>{ let pCount=Object.values(e.data.prayers||{}).filter(v=>v).length; totalPrayers+=pCount; if(e.data.gym && (e.data.gym.workoutTime?.trim()||e.data.gym.exercises?.trim())) gymDays++; }); avgPrayerStat.innerText=last7.length?(totalPrayers/last7.length).toFixed(1):0; gymDaysStat.innerText=gymDays; }
+
+  // Monthly report
+  function generateMonthlyReport(yearMonth) { // format YYYY-MM
+    let entries=getAllHabitEntries().filter(e=>e.date.startsWith(yearMonth));
+    if(!entries.length) return "No data for this month.";
+    let totalPrayers=0, totalGymDays=0, totalWorkEntries=0, daysCount=entries.length;
+    entries.forEach(e=>{ let pCount=Object.values(e.data.prayers||{}).filter(v=>v).length; totalPrayers+=pCount; if(e.data.gym && (e.data.gym.workoutTime?.trim()||e.data.gym.exercises?.trim())) totalGymDays++; if(e.data.workSchedule?.trim()) totalWorkEntries++; });
+    let avgPrayer=(totalPrayers/daysCount).toFixed(1);
+    let gymPercent=Math.round((totalGymDays/daysCount)*100);
+    let workPercent=Math.round((totalWorkEntries/daysCount)*100);
+    let goals=loadUserData(currentUser, "goals", []);
+    let monthlyGoalProgress="";
+    goals.forEach(g=>{ let start=new Date(g.startDate); let endDate=new Date(start); endDate.setDate(start.getDate()+g.totalDays-1); let endStr=endDate.toISOString().split('T')[0]; if(endStr.startsWith(yearMonth) || g.startDate.startsWith(yearMonth)) { let completed=g.tasks.filter(t=>t.completed).length; monthlyGoalProgress+=`<li><i class="fas fa-flag-checkered text-indigo-500"></i> <strong>${g.name}</strong>: ${completed}/${g.totalDays} days done (ends ${endStr})</li>`; } });
+    if(!monthlyGoalProgress) monthlyGoalProgress="<li>No goal ending/starting this month.</li>";
+    return `<div class="space-y-2"><p><i class="fas fa-mosque"></i> Avg prayers/day: <strong>${avgPrayer}/5</strong></p><p><i class="fas fa-dumbbell"></i> Gym days: ${totalGymDays}/${daysCount} (${gymPercent}%)</p><p><i class="fas fa-briefcase"></i> Work logged: ${totalWorkEntries}/${daysCount} (${workPercent}%)</p><p><i class="fas fa-trophy text-yellow-500"></i> Consistency score: ${Math.round((totalPrayers/5/daysCount)*100 + gymPercent + workPercent)/3}%</p><div class="border-t pt-2 mt-2"><span class="font-semibold">🎯 Goals touchpoint:</span><ul class="list-disc pl-5 text-xs mt-1">${monthlyGoalProgress}</ul></div></div>`;
+  }
+
+  // ======================== GOALS (with deadline) ========================
+  let goals = [];
+  function saveGoals() { if(currentUser) saveUserData(currentUser, "goals", goals); }
+  function loadGoalsFromStorage() { if(currentUser) { let stored=loadUserData(currentUser, "goals", []); goals=stored; } else goals=[]; renderGoalsUI(); }
+  function generateTasksForGoal(goal) { let tasks=[]; let start=new Date(goal.startDate); for(let i=1;i<=goal.totalDays;i++){ let taskDate=new Date(start); taskDate.setDate(start.getDate()+(i-1)); tasks.push({ dayNumber:i, description:`Day ${i}: Work on ${goal.name}`, completed:false, date:taskDate.toISOString().split('T')[0] }); } return tasks; }
+  function addGoal(name, totalDays, startDate){ let newGoal={ id:Date.now(), name, totalDays:parseInt(totalDays), startDate, tasks:generateTasksForGoal({name,totalDays,startDate}) }; goals.push(newGoal); saveGoals(); renderGoalsUI(); showToast(`Goal "${name}" created! Ends on ${getEndDate(newGoal)}`); }
+  function getEndDate(goal){ let start=new Date(goal.startDate); let end=new Date(start); end.setDate(start.getDate()+goal.totalDays-1); return end.toISOString().split('T')[0]; }
+  function deleteGoal(id){ if(confirm("Delete this goal?")){ goals=goals.filter(g=>g.id!=id); saveGoals(); renderGoalsUI(); } }
+  function toggleTaskCompletion(goalId, dayIdx, checked){ let g=goals.find(g=>g.id==goalId); if(g && g.tasks[dayIdx]){ g.tasks[dayIdx].completed=checked; saveGoals(); renderGoalsUI(); updateMonthlyReportOnDemand(); } }
+  function updateTaskDescription(goalId, dayIdx, newDesc){ let g=goals.find(g=>g.id==goalId); if(g && g.tasks[dayIdx]){ g.tasks[dayIdx].description=newDesc; saveGoals(); renderGoalsUI(); } }
+  function renderGoalsUI(){ let container=document.getElementById('goalsContainer'); if(!goals.length){ container.innerHTML='<div class="text-center text-gray-400 py-10">✨ No custom goals yet. Click "New Goal" to start a timeframe challenge.</div>'; return; }
+    let html=''; goals.forEach(goal=>{ let completed=goal.tasks.filter(t=>t.completed).length; let percent=(completed/goal.totalDays)*100; let endDate=getEndDate(goal); let daysLeft=Math.ceil((new Date(endDate)-new Date())/86400000); let deadlineStatus=daysLeft<0?"⚠️ Ended":`⏳ ${daysLeft} days left`; html+=`<div class="border border-indigo-100 rounded-2xl p-5 bg-white shadow-sm"><div class="flex flex-wrap justify-between"><div><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-flag-checkered text-indigo-500"></i> ${escapeHtml(goal.name)}</h3><div class="text-sm text-gray-500">📅 Start: ${goal.startDate} | 🔚 End: ${endDate} (${deadlineStatus}) | ${goal.totalDays} days</div></div><button class="deleteGoalBtn text-red-500 bg-red-50 px-3 py-1 rounded-full text-sm" data-id="${goal.id}"><i class="fas fa-trash"></i> Delete</button></div><div class="mt-3"><div class="flex justify-between text-xs"><span>Progress: ${completed}/${goal.totalDays} days</span><span>${Math.round(percent)}%</span></div><div class="goal-progress-bar mt-1"><div class="goal-progress-fill" style="width:${percent}%"></div></div></div><div class="mt-4 max-h-72 overflow-y-auto border-t pt-3"><div class="text-sm font-semibold mb-2">📋 Daily Tasks (edit description, check to complete)</div>`; goal.tasks.forEach((task,idx)=>{ html+=`<div class="flex flex-wrap items-center gap-2 p-2 border-b"><input type="checkbox" class="task-check w-5 h-5" data-goal="${goal.id}" data-dayidx="${idx}" ${task.completed?'checked':''}><span class="text-xs w-12">Day ${task.dayNumber}</span><span class="text-xs text-gray-400 w-24">${task.date}</span><input type="text" class="task-desc flex-1 text-sm border rounded-lg px-2 py-1" data-goal="${goal.id}" data-dayidx="${idx}" value="${escapeHtml(task.description)}"><span class="text-xs w-16">${task.completed?'✅ done':'⏳'}</span></div>`; }); html+=`</div><div class="mt-2 text-right text-xs text-gray-400"><i class="fas fa-pen"></i> Click on any task text to edit</div></div>`; }); container.innerHTML=html;
+    document.querySelectorAll('.task-check').forEach(cb=>{ cb.addEventListener('change',(e)=>{ let goalId=parseInt(cb.dataset.goal); let idx=parseInt(cb.dataset.dayidx); toggleTaskCompletion(goalId, idx, cb.checked); }); });
+    document.querySelectorAll('.task-desc').forEach(inp=>{ inp.addEventListener('change',(e)=>{ let goalId=parseInt(inp.dataset.goal); let idx=parseInt(inp.dataset.dayidx); updateTaskDescription(goalId, idx, inp.value); }); });
+    document.querySelectorAll('.deleteGoalBtn').forEach(btn=>{ btn.addEventListener('click',()=>deleteGoal(parseInt(btn.dataset.id))); });
+  }
+  function escapeHtml(str){ if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+  function updateMonthlyReportOnDemand(){ let monthInput=document.getElementById('reportMonth'); if(monthInput.value) document.getElementById('monthlyReportContent').innerHTML=generateMonthlyReport(monthInput.value); }
+  
+  // ======================== INITIALIZE AFTER LOGIN ========================
+  function initAppAfterLogin(){
+    document.getElementById("currentUsername").innerText = currentUser;
+    let todayStr=new Date().toISOString().split('T')[0];
+    dateInput.value=todayStr;
+    loadEntryForDate(todayStr);
+    renderRecentEntries();
+    updateStats();
+    updateDurationDisplay();
+    updatePrayerCount();
+    loadGoalsFromStorage();
+    // monthly report default current month
+    let now=new Date(); let currentMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    document.getElementById('reportMonth').value=currentMonth;
+    document.getElementById('monthlyReportContent').innerHTML=generateMonthlyReport(currentMonth);
+    document.getElementById('loadReportBtn').onclick=()=>{ let m=document.getElementById('reportMonth').value; if(m) document.getElementById('monthlyReportContent').innerHTML=generateMonthlyReport(m); };
+    // goal modal events
+    const modal=document.getElementById('goalModal'), openBtn=document.getElementById('openGoalModalBtn'), closeModal=document.getElementById('closeModalBtn'), confirmGoal=document.getElementById('confirmCreateGoal');
+    openBtn.onclick=()=>{ document.getElementById('goalName').value=''; document.getElementById('goalDays').value=30; document.getElementById('goalStartDate').value=todayStr; modal.classList.remove('hidden'); modal.classList.add('flex'); };
+    closeModal.onclick=()=>{ modal.classList.add('hidden'); modal.classList.remove('flex'); };
+    confirmGoal.onclick=()=>{ let name=document.getElementById('goalName').value.trim(); let days=parseInt(document.getElementById('goalDays').value); let start=document.getElementById('goalStartDate').value; if(!name||days<1||!start){ showToast("Fill all fields",true); return; } addGoal(name,days,start); modal.classList.add('hidden'); modal.classList.remove('flex'); };
+    window.onclick=(e)=>{ if(e.target===modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); } };
+  }
+
+  // ======================== LOGIN UI HANDLERS ========================
+  function showToast(msg,err=false){ let toast=document.getElementById('toastMsg'); toast.textContent=msg; toast.classList.remove('opacity-0'); toast.classList.add('opacity-100'); if(err) toast.classList.add('bg-red-700'); else toast.classList.remove('bg-red-700'); setTimeout(()=>{ toast.classList.remove('opacity-100'); toast.classList.add('opacity-0'); if(err) toast.classList.remove('bg-red-700'); },2200); }
+  document.getElementById('loginBtn').addEventListener('click',()=>{ let user=document.getElementById('loginUsername').value.trim(); let pwd=document.getElementById('loginPassword').value; if(login(user,pwd)){ document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); initAppAfterLogin(); } else showToast("Invalid username",true); });
+  document.getElementById('logoutBtn').addEventListener('click',()=>{ logout(); });
+  clearAllDataBtn.addEventListener('click',()=>{ resetCurrentUserData(); });
+  // attach habit event listeners after DOM ready
+  function attachHabitEvents(){ saveBtn.addEventListener('click',saveCurrentEntry); clearFormBtn.addEventListener('click',clearForm); deleteEntryBtn.addEventListener('click',deleteCurrentEntry); todayBtn.addEventListener('click',()=>{ let t=new Date().toISOString().split('T')[0]; dateInput.value=t; loadEntryForDate(t); }); dateInput.addEventListener('change',(e)=>loadEntryForDate(e.target.value)); wakeTime.addEventListener('input',updateDurationDisplay); sleepTime.addEventListener('input',updateDurationDisplay); [prayerFajr,prayerDhuhr,prayerAsr,prayerMaghrib,prayerIsha].forEach(cb=>cb.addEventListener('change',updatePrayerCount)); }
+  attachHabitEvents();
+  // check if already logged in from previous session
+  let lastUser=localStorage.getItem("last_logged_user");
+  if(lastUser){ currentUser=lastUser; document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); initAppAfterLogin(); }
+</script>
+</body>
+</html>

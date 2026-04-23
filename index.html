@@ -2,46 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Habit Compass | Cloud Sync + Auth</title>
-  <!-- Tailwind + Font Awesome -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habit Compass | Cloud Sync</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <!-- Supabase JS -->
+  <!-- Supabase JS - must load before our script -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); font-family: 'Inter', system-ui, sans-serif; }
-    .card-hover { transition: all 0.2s ease; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 12px 20px -12px rgba(0,0,0,0.15); }
-    .goal-progress-bar { height: 6px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
-    .goal-progress-fill { height: 100%; background: #4f46e5; width: 0%; transition: width 0.2s; }
-    .modal-bg { background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
-    .auth-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1e1b4b, #312e81); }
+    .loading-spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-<!-- AUTH SCREEN (shown when not logged in) -->
-<div id="authScreen" class="auth-container p-4">
+<!-- LOGIN SCREEN -->
+<div id="authScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 to-indigo-700 p-4">
   <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8">
     <div class="text-center mb-6">
-      <i class="fas fa-lock text-indigo-600 text-4xl mb-2"></i>
+      <i class="fas fa-chart-line text-indigo-600 text-4xl mb-2"></i>
       <h2 class="text-2xl font-bold text-gray-800">Habit Compass</h2>
       <p class="text-gray-500">Sign in to sync across devices</p>
     </div>
     <div class="space-y-4">
       <div>
-        <label class="block text-sm font-medium">Email</label>
-        <input type="email" id="authEmail" class="w-full border rounded-xl px-4 py-2.5 mt-1" placeholder="you@example.com">
+        <label class="block text-sm font-medium text-gray-700">Email</label>
+        <input type="email" id="authEmail" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-indigo-500" placeholder="you@example.com" value="shaikhani1996@gmail.com">
       </div>
       <div>
-        <label class="block text-sm font-medium">Password</label>
-        <input type="password" id="authPassword" class="w-full border rounded-xl px-4 py-2.5 mt-1" placeholder="••••••">
+        <label class="block text-sm font-medium text-gray-700">Password</label>
+        <input type="password" id="authPassword" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-indigo-500" placeholder="••••••">
       </div>
       <div class="flex gap-3">
-        <button id="loginBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-xl transition"><i class="fas fa-sign-in-alt"></i> Login</button>
-        <button id="signupBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-xl transition"><i class="fas fa-user-plus"></i> Sign Up</button>
+        <button id="loginBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+          <i class="fas fa-sign-in-alt"></i> Login
+        </button>
+        <button id="signupBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+          <i class="fas fa-user-plus"></i> Sign Up
+        </button>
       </div>
+      <div id="authError" class="text-red-600 text-sm text-center hidden"></div>
       <p class="text-xs text-gray-400 text-center">Your data is encrypted and private.</p>
     </div>
   </div>
@@ -49,390 +48,177 @@
 
 <!-- MAIN APP (hidden until logged in) -->
 <div id="mainApp" class="hidden p-4 md:p-6 max-w-7xl mx-auto">
-  <!-- Header -->
-  <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
-    <div>
-      <h1 class="text-3xl font-extrabold bg-gradient-to-r from-indigo-800 to-indigo-600 bg-clip-text text-transparent"><i class="fas fa-chart-line text-indigo-500 mr-2"></i>Habit Compass</h1>
-      <p class="text-gray-500 text-sm">Cloud sync · Password protected · Monthly reports</p>
-    </div>
-    <div class="flex gap-3 items-center">
-      <span id="userEmailBadge" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm"><i class="fas fa-user-circle"></i> <span id="currentUserEmail"></span></span>
-      <button id="logoutBtn" class="bg-white/80 border border-gray-300 text-gray-700 px-4 py-2 rounded-xl hover:bg-gray-100"><i class="fas fa-sign-out-alt"></i> Logout</button>
-    </div>
-  </div>
-
-  <!-- Main Grid: Daily Entry + Stats & Reports -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- Left: Daily entry form -->
-    <div class="lg:col-span-2 space-y-5">
-      <div class="bg-white rounded-2xl shadow-md p-5 border card-hover">
-        <div class="flex flex-wrap justify-between items-center gap-3">
-          <div class="flex items-center gap-3"><i class="fas fa-calendar-alt text-indigo-500 text-xl"></i><span class="font-semibold">Track for:</span><input type="date" id="trackDate" class="border rounded-xl px-3 py-2 bg-gray-50"></div>
-          <div class="flex gap-2"><button id="todayBtn" class="text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl text-sm"><i class="far fa-sun"></i> Today</button><button id="deleteEntryBtn" class="text-red-600 bg-red-50 px-3 py-1.5 rounded-xl text-sm"><i class="fas fa-trash"></i> Delete</button></div>
-        </div>
-      </div>
-      <!-- Wake & Sleep -->
-      <div class="bg-white rounded-2xl shadow-md p-5 border">
-        <div class="flex items-center gap-2 border-b pb-2 mb-4"><i class="fas fa-bed text-indigo-400 text-xl"></i><h2 class="text-xl font-bold">🌙 Wake → Sleep</h2></div>
-        <div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-600">Wake up</label><input type="time" id="wakeTime" class="w-full border rounded-xl px-4 py-2.5"></div><div><label class="text-sm text-gray-600">Sleep time</label><input type="time" id="sleepTime" class="w-full border rounded-xl px-4 py-2.5"></div></div>
-        <div class="mt-3 text-sm text-gray-500"><i class="fas fa-hourglass-half text-indigo-400"></i> Awake: <span id="durationDisplay" class="font-semibold">—</span></div>
-      </div>
-      <!-- Prayers -->
-      <div class="bg-white rounded-2xl shadow-md p-5 border">
-        <div class="flex items-center gap-2 border-b pb-2 mb-3"><i class="fas fa-mosque text-emerald-600 text-xl"></i><h2 class="text-xl font-bold">🕌 5 Times Namaj</h2></div>
-        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl"><input type="checkbox" id="prayerFajr" class="w-5 h-5"> Fajr</label>
-          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl"><input type="checkbox" id="prayerDhuhr"> Dhuhr</label>
-          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl"><input type="checkbox" id="prayerAsr"> Asr</label>
-          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl"><input type="checkbox" id="prayerMaghrib"> Maghrib</label>
-          <label class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl"><input type="checkbox" id="prayerIsha"> Isha</label>
-        </div>
-        <div class="mt-2 text-right text-xs text-gray-400" id="prayerCountPreview">0/5</div>
-      </div>
-      <!-- Gym -->
-      <div class="bg-white rounded-2xl shadow-md p-5 border">
-        <div class="flex items-center gap-2 border-b pb-2 mb-4"><i class="fas fa-dumbbell text-orange-500 text-xl"></i><h2 class="text-xl font-bold">💪 Gym</h2></div>
-        <div class="space-y-3"><input type="text" id="gymTime" placeholder="⏱️ Time (e.g. 6-7 PM)" class="w-full border rounded-xl px-4 py-2.5"><input type="text" id="gymExercises" placeholder="🏋️ Exercises" class="w-full border rounded-xl px-4 py-2.5"><input type="text" id="gymBodyPart" placeholder="🎯 Body part" class="w-full border rounded-xl px-4 py-2.5"></div>
-      </div>
-      <!-- Work Schedule -->
-      <div class="bg-white rounded-2xl shadow-md p-5 border">
-        <div class="flex items-center gap-2 border-b pb-2 mb-3"><i class="fas fa-briefcase text-sky-600 text-xl"></i><h2 class="text-xl font-bold">📋 Work Schedule</h2></div>
-        <textarea id="workSchedule" rows="2" class="w-full border rounded-xl px-4 py-2.5" placeholder="Today's tasks..."></textarea>
-      </div>
-      <div class="flex gap-3 sticky bottom-4 bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-lg border"><button id="saveEntryBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl flex-1"><i class="fas fa-save"></i> Save Day</button><button id="clearFormBtn" class="bg-gray-200 hover:bg-gray-300 px-5 rounded-xl"><i class="fas fa-eraser"></i> Clear</button></div>
-    </div>
-
-    <!-- Right: Stats + Monthly Report + Recent -->
-    <div class="space-y-5">
-      <div class="bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-5 border">
-        <h3 class="font-bold text-lg"><i class="fas fa-chart-simple text-indigo-500"></i> Quick glance</h3>
-        <div class="mt-3 grid grid-cols-2 gap-3 text-center"><div class="bg-white p-2 rounded-xl"><p class="text-xs text-gray-500">Avg. Prayer (7d)</p><p id="avgPrayerStat" class="text-2xl font-bold text-indigo-700">0</p></div><div class="bg-white p-2 rounded-xl"><p class="text-xs text-gray-500">Gym days (7d)</p><p id="gymDaysStat" class="text-2xl font-bold text-orange-600">0</p></div></div>
-      </div>
-      <div class="bg-white rounded-2xl shadow-md p-5 border">
-        <div class="flex justify-between flex-wrap gap-2"><h3 class="font-bold text-lg"><i class="fas fa-calendar-alt text-purple-600"></i> Monthly Report</h3><div class="flex gap-2"><input type="month" id="reportMonth" class="border rounded-lg px-2 py-1 text-sm"><button id="loadReportBtn" class="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm"><i class="fas fa-chart-bar"></i> Show</button></div></div>
-        <div id="monthlyReportContent" class="mt-3 text-sm space-y-2 bg-gray-50 p-3 rounded-xl max-h-60 overflow-y-auto">Select a month</div>
-      </div>
-      <div class="bg-white rounded-2xl shadow-md p-5 border">
-        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-lg"><i class="fas fa-history"></i> Recent days</h3><span class="text-xs text-gray-400">click to load</span></div>
-        <div id="recentList" class="space-y-3 max-h-96 overflow-y-auto"><div class="text-center text-gray-400 py-6">Loading...</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Custom Goals Section -->
-  <div class="mt-10 bg-white rounded-2xl shadow-xl border border-indigo-100 overflow-hidden">
-    <div class="bg-indigo-50 px-6 py-4 flex flex-wrap justify-between items-center gap-3"><div><h2 class="text-2xl font-bold text-indigo-800"><i class="fas fa-bullseye"></i> Custom Goals (with deadline)</h2><p class="text-gray-600 text-sm">Sync across devices — each goal has daily tasks</p></div><button id="openGoalModalBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl shadow"><i class="fas fa-plus-circle"></i> New Goal</button></div>
-    <div id="goalsContainer" class="p-6 space-y-6 max-h-[600px] overflow-y-auto">Loading...</div>
-  </div>
+  <div class="text-center py-20 text-gray-500">Loading your dashboard...</div>
 </div>
-
-<!-- Goal Creation Modal -->
-<div id="goalModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
-  <div class="bg-white rounded-2xl max-w-lg w-full mx-4 p-6 shadow-2xl"><div class="flex justify-between items-center border-b pb-3 mb-4"><h3 class="text-xl font-bold"><i class="fas fa-flag-checkered text-indigo-600"></i> Create Goal</h3><button id="closeModalBtn" class="text-gray-400 text-2xl">&times;</button></div>
-    <div class="space-y-4"><div><label>Goal name</label><input type="text" id="goalName" placeholder="Learn Python in 30 days" class="w-full border rounded-xl px-4 py-2"></div><div><label>Total days</label><input type="number" id="goalDays" min="1" max="365" value="30" class="w-full border rounded-xl px-4 py-2"></div><div><label>Start date</label><input type="date" id="goalStartDate" class="w-full border rounded-xl px-4 py-2"></div><button id="confirmCreateGoal" class="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-xl">Create</button></div></div>
-</div>
-
-<!-- Toast Notification -->
-<div id="toastMsg" class="fixed bottom-6 right-6 bg-gray-900 text-white px-5 py-2 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50"></div>
 
 <script>
-  // ---------- SUPABASE INIT ----------
+  // ========== SUPABASE CONFIGURATION ==========
   const SUPABASE_URL = "https://hbxyoyqjwregpwipunwt.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_S_dkVjaqIjijKQFXPRHTiw_VXa0IYfE";
+  
+  // Initialize Supabase client
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // Global state
-  let currentUser = null;
-  let goals = [];      // cached goals for current user
-
-  // Helper: show toast
-  function showToast(msg, isError = false) {
-    const toast = document.getElementById('toastMsg');
-    toast.textContent = msg;
-    toast.classList.remove('opacity-0');
-    toast.classList.add('opacity-100');
-    if (isError) toast.classList.add('bg-red-700');
-    else toast.classList.remove('bg-red-700');
-    setTimeout(() => {
-      toast.classList.remove('opacity-100');
-      toast.classList.add('opacity-0');
-      if (isError) toast.classList.remove('bg-red-700');
-    }, 2500);
+  
+  // DOM elements
+  const authScreen = document.getElementById('authScreen');
+  const mainApp = document.getElementById('mainApp');
+  const authEmail = document.getElementById('authEmail');
+  const authPassword = document.getElementById('authPassword');
+  const loginBtn = document.getElementById('loginBtn');
+  const signupBtn = document.getElementById('signupBtn');
+  const authErrorDiv = document.getElementById('authError');
+  
+  // Helper to show error on login screen
+  function showAuthError(message) {
+    authErrorDiv.textContent = message;
+    authErrorDiv.classList.remove('hidden');
+    setTimeout(() => authErrorDiv.classList.add('hidden'), 4000);
   }
-
-  // ---------- AUTH ----------
-  async function checkSession() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      currentUser = session.user;
-      document.getElementById('authScreen').classList.add('hidden');
-      document.getElementById('mainApp').classList.remove('hidden');
-      document.getElementById('currentUserEmail').innerText = currentUser.email;
-      await loadAllData();       // load habits, stats, goals
+  
+  // Helper to show loading state on buttons
+  function setButtonLoading(btn, isLoading) {
+    if (isLoading) {
+      btn.disabled = true;
+      btn.classList.add('opacity-70');
+      btn.innerHTML = '<span class="loading-spinner"></span> Loading...';
     } else {
-      document.getElementById('authScreen').classList.remove('hidden');
-      document.getElementById('mainApp').classList.add('hidden');
+      btn.disabled = false;
+      btn.classList.remove('opacity-70');
+      if (btn.id === 'loginBtn') btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+      else btn.innerHTML = '<i class="fas fa-user-plus"></i> Sign Up';
     }
   }
-
-  document.getElementById('loginBtn').onclick = async () => {
-    const email = document.getElementById('authEmail').value.trim();
-    const password = document.getElementById('authPassword').value;
-    if (!email || !password) { showToast("Email & password required", true); return; }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) showToast(error.message, true);
-    else { showToast("Logged in!"); checkSession(); }
-  };
-  document.getElementById('signupBtn').onclick = async () => {
-    const email = document.getElementById('authEmail').value.trim();
-    const password = document.getElementById('authPassword').value;
-    if (!email || !password) { showToast("Email & password required", true); return; }
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) showToast(error.message, true);
-    else showToast("Check email for confirmation (or sign in if disabled)");
-  };
-  document.getElementById('logoutBtn').onclick = async () => {
-    await supabase.auth.signOut();
-    currentUser = null;
-    checkSession();
-  };
-
-  // ---------- DAILY HABITS CRUD ----------
-  const dateInput = document.getElementById('trackDate');
-  const wakeTime = document.getElementById('wakeTime');
-  const sleepTime = document.getElementById('sleepTime');
-  const durationSpan = document.getElementById('durationDisplay');
-  const prayerFajr = document.getElementById('prayerFajr'), prayerDhuhr = document.getElementById('prayerDhuhr'), prayerAsr = document.getElementById('prayerAsr'), prayerMaghrib = document.getElementById('prayerMaghrib'), prayerIsha = document.getElementById('prayerIsha');
-  const gymTime = document.getElementById('gymTime'), gymExercises = document.getElementById('gymExercises'), gymBodyPart = document.getElementById('gymBodyPart'), workSchedule = document.getElementById('workSchedule');
-  const prayerCountSpan = document.getElementById('prayerCountPreview');
-  const recentListDiv = document.getElementById('recentList');
-  const avgPrayerStat = document.getElementById('avgPrayerStat'), gymDaysStat = document.getElementById('gymDaysStat');
-
-  function computeDuration(wake, sleep) { if (!wake || !sleep) return null; const [wh,wm]=wake.split(':').map(Number); let [sh,sm]=sleep.split(':').map(Number); let wt=wh*60+wm; let st=sh*60+sm; if(st<wt) st+=1440; let diff=st-wt; return {hours:Math.floor(diff/60), mins:diff%60}; }
-  function updateDurationDisplay() { let d=computeDuration(wakeTime.value, sleepTime.value); durationSpan.innerText = d?`${d.hours}h ${d.mins}m`:(wakeTime.value&&sleepTime.value?'⚠️':'—'); }
-  function updatePrayerCount() { let c=[prayerFajr,prayerDhuhr,prayerAsr,prayerMaghrib,prayerIsha].filter(cb=>cb.checked).length; prayerCountSpan.innerText=`${c}/5 completed`; }
-  function getCurrentFormData() { return { wakeTime:wakeTime.value, sleepTime:sleepTime.value, prayers:{fajr:prayerFajr.checked,dhuhr:prayerDhuhr.checked,asr:prayerAsr.checked,maghrib:prayerMaghrib.checked,isha:prayerIsha.checked}, gym:{workoutTime:gymTime.value, exercises:gymExercises.value, bodyPart:gymBodyPart.value}, workSchedule:workSchedule.value }; }
-  function populateForm(data) { if(!data) return; wakeTime.value=data.wakeTime||''; sleepTime.value=data.sleepTime||''; prayerFajr.checked=data.prayers?.fajr||false; prayerDhuhr.checked=data.prayers?.dhuhr||false; prayerAsr.checked=data.prayers?.asr||false; prayerMaghrib.checked=data.prayers?.maghrib||false; prayerIsha.checked=data.prayers?.isha||false; gymTime.value=data.gym?.workoutTime||''; gymExercises.value=data.gym?.exercises||''; gymBodyPart.value=data.gym?.bodyPart||''; workSchedule.value=data.workSchedule||''; updateDurationDisplay(); updatePrayerCount(); }
-  function clearForm() { wakeTime.value=''; sleepTime.value=''; [prayerFajr,prayerDhuhr,prayerAsr,prayerMaghrib,prayerIsha].forEach(cb=>cb.checked=false); gymTime.value=''; gymExercises.value=''; gymBodyPart.value=''; workSchedule.value=''; updateDurationDisplay(); updatePrayerCount(); }
-
-  async function saveHabitEntry() {
-    const date = dateInput.value;
-    if (!date) { showToast("Select a date", true); return; }
-    if (!currentUser) return;
-    const data = getCurrentFormData();
-    const { error } = await supabase.from('daily_habits').upsert({
-      user_id: currentUser.id,
-      date: date,
-      wake_time: data.wakeTime,
-      sleep_time: data.sleepTime,
-      prayers: data.prayers,
-      gym: data.gym,
-      work_schedule: data.workSchedule,
-      updated_at: new Date()
-    }, { onConflict: 'user_id, date' });
-    if (error) { showToast("Save error: "+error.message, true); return; }
-    showToast(`Saved ${date}`);
-    await loadRecentEntries();
-    await updateStats();
-  }
-
-  async function loadHabitForDate(date) {
-    if (!currentUser) return;
-    const { data, error } = await supabase.from('daily_habits').select('*').eq('user_id', currentUser.id).eq('date', date).maybeSingle();
-    if (error && error.code !== 'PGRST116') { showToast("Load error", true); return; }
-    populateForm(data);
-  }
-
-  async function deleteCurrentEntry() {
-    const date = dateInput.value;
-    if (!date) return;
-    const { error } = await supabase.from('daily_habits').delete().eq('user_id', currentUser.id).eq('date', date);
-    if (error) { showToast("Delete failed", true); return; }
-    clearForm();
-    showToast(`Deleted ${date}`);
-    await loadRecentEntries();
-    await updateStats();
-  }
-
-  async function loadRecentEntries() {
-    if (!currentUser) return;
-    const { data, error } = await supabase.from('daily_habits').select('*').eq('user_id', currentUser.id).order('date', { ascending: false }).limit(12);
-    if (error) { recentListDiv.innerHTML = '<div class="text-center text-gray-400">Error loading</div>'; return; }
-    if (!data.length) { recentListDiv.innerHTML = '<div class="text-center text-gray-400">No entries yet</div>'; return; }
-    let html = '';
-    data.forEach(entry => {
-      let pCount = Object.values(entry.prayers || {}).filter(v=>v).length;
-      let gymInfo = entry.gym?.workoutTime || (entry.gym?.exercises ? '✓' : '—');
-      html += `<div class="recent-card bg-gray-50 p-3 rounded-xl hover:shadow cursor-pointer" data-date="${entry.date}">
-        <div><div class="font-bold text-indigo-800 text-sm">${entry.date}</div>
-        <div class="text-xs text-gray-500">🌙 ${entry.wake_time||'—'} → ${entry.sleep_time||'—'} · 🕌 ${pCount}/5</div>
-        <div class="text-xs">💪 ${gymInfo} · 📋 ${(entry.work_schedule||'').substring(0,25)}</div>
-        </div></div>`;
-    });
-    recentListDiv.innerHTML = html;
-    document.querySelectorAll('.recent-card').forEach(card => {
-      card.addEventListener('click', () => { let d = card.getAttribute('data-date'); if(d) { dateInput.value = d; loadHabitForDate(d); } });
-    });
-  }
-
-  async function updateStats() {
-    if (!currentUser) return;
-    let today = new Date(); today.setHours(0,0,0,0);
-    let weekAgo = new Date(today); weekAgo.setDate(today.getDate()-6);
-    let weekStart = weekAgo.toISOString().split('T')[0];
-    let { data, error } = await supabase.from('daily_habits').select('*').eq('user_id', currentUser.id).gte('date', weekStart);
-    if (error || !data) return;
-    let totalPrayers = 0, gymDays = 0;
-    data.forEach(day => {
-      let pCount = Object.values(day.prayers || {}).filter(v=>v).length;
-      totalPrayers += pCount;
-      if (day.gym && (day.gym.workoutTime || day.gym.exercises)) gymDays++;
-    });
-    let days = data.length || 1;
-    avgPrayerStat.innerText = (totalPrayers/days).toFixed(1);
-    gymDaysStat.innerText = gymDays;
-  }
-
-  // Monthly report
-  async function showMonthlyReport() {
-    let month = document.getElementById('reportMonth').value;
-    if (!month || !currentUser) return;
-    let start = month + '-01';
-    let endDate = new Date(month + '-01'); endDate.setMonth(endDate.getMonth()+1); endDate.setDate(0);
-    let end = endDate.toISOString().split('T')[0];
-    let { data, error } = await supabase.from('daily_habits').select('*').eq('user_id', currentUser.id).gte('date', start).lte('date', end);
-    if (error || !data.length) { document.getElementById('monthlyReportContent').innerHTML = '<p class="text-gray-400">No data for this month</p>'; return; }
-    let days = data.length;
-    let totalPrayers = 0, gymDays = 0, workDays = 0;
-    data.forEach(day => { totalPrayers += Object.values(day.prayers || {}).filter(v=>v).length; if(day.gym?.workoutTime || day.gym?.exercises) gymDays++; if(day.work_schedule?.trim()) workDays++; });
-    let avgPrayer = (totalPrayers/days).toFixed(1);
-    let gymPct = Math.round((gymDays/days)*100);
-    let workPct = Math.round((workDays/days)*100);
-    let consistency = Math.round((totalPrayers/5/days)*100 + gymPct + workPct)/3;
-    let html = `<div><i class="fas fa-mosque"></i> Avg prayers: ${avgPrayer}/5</div><div><i class="fas fa-dumbbell"></i> Gym: ${gymDays}/${days} (${gymPct}%)</div><div><i class="fas fa-briefcase"></i> Work logged: ${workDays}/${days} (${workPct}%)</div><div><i class="fas fa-trophy"></i> Consistency: ${Math.round(consistency)}%</div>`;
-    document.getElementById('monthlyReportContent').innerHTML = html;
-  }
-
-  // ---------- GOALS FUNCTIONS (sync with Supabase) ----------
-  async function loadGoals() {
-    if (!currentUser) return;
-    const { data, error } = await supabase.from('goals').select('*').eq('user_id', currentUser.id);
-    if (error) { console.error(error); return; }
-    goals = data || [];
-    renderGoalsUI();
-  }
-  async function saveGoalToDb(goal) {
-    if (!currentUser) return;
-    const { error } = await supabase.from('goals').upsert(goal);
-    if (error) showToast("Goal save error: "+error.message, true);
-    else await loadGoals();
-  }
-  async function deleteGoalFromDb(id) {
-    if (!currentUser) return;
-    const { error } = await supabase.from('goals').delete().eq('id', id);
-    if (error) showToast("Delete failed", true);
-    else await loadGoals();
-  }
-  function generateTasksForGoal(name, totalDays, startDate) {
-    let tasks = [];
-    let start = new Date(startDate);
-    for (let i=1; i<=totalDays; i++) {
-      let taskDate = new Date(start); taskDate.setDate(start.getDate() + i - 1);
-      tasks.push({ dayNumber: i, description: `Day ${i}: Work on ${name}`, completed: false, date: taskDate.toISOString().split('T')[0] });
+  
+  // ========== AUTHENTICATION FUNCTIONS ==========
+  async function handleLogin() {
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+    
+    if (!email || !password) {
+      showAuthError('Please enter email and password');
+      return;
     }
-    return tasks;
-  }
-  async function createGoal(name, totalDays, startDate) {
-    let newGoal = { user_id: currentUser.id, name, total_days: totalDays, start_date: startDate, tasks: generateTasksForGoal(name, totalDays, startDate) };
-    const { data, error } = await supabase.from('goals').insert(newGoal).select();
-    if (error) showToast("Error creating goal", true);
-    else { await loadGoals(); showToast(`Goal "${name}" created`); }
-  }
-  async function toggleGoalTask(goalId, dayIdx, checked) {
-    let goal = goals.find(g=>g.id == goalId);
-    if (!goal) return;
-    goal.tasks[dayIdx].completed = checked;
-    const { error } = await supabase.from('goals').update({ tasks: goal.tasks }).eq('id', goalId);
-    if (error) showToast("Update failed", true);
-    else await loadGoals();
-  }
-  async function updateGoalTaskDesc(goalId, dayIdx, newDesc) {
-    let goal = goals.find(g=>g.id == goalId);
-    if (!goal) return;
-    goal.tasks[dayIdx].description = newDesc;
-    const { error } = await supabase.from('goals').update({ tasks: goal.tasks }).eq('id', goalId);
-    if (error) showToast("Update failed", true);
-    else await loadGoals();
-  }
-
-  function renderGoalsUI() {
-    const container = document.getElementById('goalsContainer');
-    if (!goals.length) { container.innerHTML = '<div class="text-center text-gray-400 py-10">✨ No custom goals yet. Click "New Goal".</div>'; return; }
-    let html = '';
-    goals.forEach(goal => {
-      let completed = goal.tasks.filter(t=>t.completed).length;
-      let percent = (completed/goal.total_days)*100;
-      let start = new Date(goal.start_date);
-      let end = new Date(start); end.setDate(start.getDate() + goal.total_days - 1);
-      let endStr = end.toISOString().split('T')[0];
-      let daysLeft = Math.ceil((end - new Date())/86400000);
-      let deadlineStatus = daysLeft < 0 ? "Ended" : `${daysLeft} days left`;
-      html += `<div class="border border-indigo-100 rounded-2xl p-5 bg-white shadow-sm">
-        <div class="flex flex-wrap justify-between"><div><h3 class="text-xl font-bold"><i class="fas fa-flag-checkered text-indigo-500"></i> ${escapeHtml(goal.name)}</h3><div class="text-sm text-gray-500">📅 Start: ${goal.start_date} | 🔚 End: ${endStr} (${deadlineStatus})</div></div>
-        <button class="deleteGoalBtn text-red-500 bg-red-50 px-3 py-1 rounded-full" data-id="${goal.id}"><i class="fas fa-trash"></i> Delete</button></div>
-        <div class="mt-3"><div class="flex justify-between text-xs"><span>${completed}/${goal.total_days} days</span><span>${Math.round(percent)}%</span></div><div class="goal-progress-bar mt-1"><div class="goal-progress-fill" style="width:${percent}%"></div></div></div>
-        <div class="mt-4 max-h-72 overflow-y-auto border-t pt-3"><div class="text-sm font-semibold mb-2">📋 Daily Tasks</div>`;
-      goal.tasks.forEach((task, idx) => {
-        html += `<div class="flex flex-wrap items-center gap-2 p-2 border-b"><input type="checkbox" class="task-check w-5 h-5" data-goal="${goal.id}" data-dayidx="${idx}" ${task.completed?'checked':''}><span class="text-xs w-12">Day ${task.dayNumber}</span><span class="text-xs text-gray-400 w-24">${task.date}</span>
-        <input type="text" class="task-desc flex-1 text-sm border rounded-lg px-2 py-1" data-goal="${goal.id}" data-dayidx="${idx}" value="${escapeHtml(task.description)}"><span class="text-xs w-16">${task.completed?'✅ done':'⏳'}</span></div>`;
-      });
-      html += `</div></div>`;
+    
+    setButtonLoading(loginBtn, true);
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password
     });
-    container.innerHTML = html;
-    // attach events
-    document.querySelectorAll('.task-check').forEach(cb => {
-      cb.addEventListener('change', (e) => { let goalId = parseInt(cb.dataset.goal); let idx = parseInt(cb.dataset.dayidx); toggleGoalTask(goalId, idx, cb.checked); });
+    
+    setButtonLoading(loginBtn, false);
+    
+    if (error) {
+      console.error('Login error:', error);
+      showAuthError(error.message || 'Login failed. Check credentials.');
+      return;
+    }
+    
+    // Success
+    console.log('Logged in user:', data.user);
+    await loadMainApp();
+  }
+  
+  async function handleSignup() {
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+    
+    if (!email || !password) {
+      showAuthError('Please enter email and password');
+      return;
+    }
+    if (password.length < 6) {
+      showAuthError('Password must be at least 6 characters');
+      return;
+    }
+    
+    setButtonLoading(signupBtn, true);
+    
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password
     });
-    document.querySelectorAll('.task-desc').forEach(inp => {
-      inp.addEventListener('change', (e) => { let goalId = parseInt(inp.dataset.goal); let idx = parseInt(inp.dataset.dayidx); updateGoalTaskDesc(goalId, idx, inp.value); });
-    });
-    document.querySelectorAll('.deleteGoalBtn').forEach(btn => {
-      btn.addEventListener('click', (e) => { let id = parseInt(btn.dataset.id); if(confirm("Delete goal?")) deleteGoalFromDb(id); });
+    
+    setButtonLoading(signupBtn, false);
+    
+    if (error) {
+      console.error('Signup error:', error);
+      showAuthError(error.message || 'Signup failed.');
+      return;
+    }
+    
+    if (data.user) {
+      showAuthError('✅ Account created! You can now login.');
+      // Clear password field after signup
+      authPassword.value = '';
+    } else {
+      showAuthError('Signup successful. Please check your email to confirm (or just login if disabled).');
+    }
+  }
+  
+  // ========== CHECK EXISTING SESSION ==========
+  async function checkExistingSession() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Session check error:', error);
+      return false;
+    }
+    if (session) {
+      console.log('Existing session found for:', session.user.email);
+      await loadMainApp();
+      return true;
+    }
+    return false;
+  }
+  
+  // ========== LOAD THE ACTUAL HABIT TRACKER (simplified version to prove it works) ==========
+  async function loadMainApp() {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // No user, show login screen
+      authScreen.classList.remove('hidden');
+      mainApp.classList.add('hidden');
+      return;
+    }
+    
+    // Show main app with a welcome message
+    mainApp.innerHTML = `
+      <div class="bg-white rounded-2xl shadow-xl p-8 text-center">
+        <i class="fas fa-check-circle text-green-500 text-5xl mb-4"></i>
+        <h2 class="text-2xl font-bold text-gray-800">Welcome, ${user.email}!</h2>
+        <p class="text-gray-600 mt-2">You are successfully logged in.</p>
+        <p class="text-gray-500 text-sm mt-4">The full habit tracker will load here.</p>
+        <button id="logoutBtnMain" class="mt-6 bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-xl transition"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    `;
+    
+    authScreen.classList.add('hidden');
+    mainApp.classList.remove('hidden');
+    
+    // Attach logout button
+    document.getElementById('logoutBtnMain')?.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      authScreen.classList.remove('hidden');
+      mainApp.classList.add('hidden');
+      mainApp.innerHTML = '<div class="text-center py-20 text-gray-500">Loading your dashboard...</div>';
     });
   }
-  function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
-
-  // Modal logic
-  const modal = document.getElementById('goalModal'), openModal = document.getElementById('openGoalModalBtn'), closeModal = document.getElementById('closeModalBtn'), confirmGoal = document.getElementById('confirmCreateGoal');
-  openModal.onclick = () => { document.getElementById('goalName').value = ''; document.getElementById('goalDays').value = 30; document.getElementById('goalStartDate').value = new Date().toISOString().split('T')[0]; modal.classList.remove('hidden'); modal.classList.add('flex'); };
-  closeModal.onclick = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
-  confirmGoal.onclick = async () => { let name = document.getElementById('goalName').value.trim(); let days = parseInt(document.getElementById('goalDays').value); let start = document.getElementById('goalStartDate').value; if(!name || days<1 || !start) { showToast("Fill all fields", true); return; } await createGoal(name, days, start); modal.classList.add('hidden'); modal.classList.remove('flex'); };
-  window.onclick = (e) => { if(e.target === modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); } };
-
-  // Load everything after login
-  async function loadAllData() {
-    await loadRecentEntries();
-    await updateStats();
-    await loadGoals();
-    let today = new Date().toISOString().split('T')[0];
-    dateInput.value = today;
-    await loadHabitForDate(today);
-    document.getElementById('reportMonth').value = new Date().toISOString().slice(0,7);
-    await showMonthlyReport();
-  }
-
-  // Event listeners for habit controls
-  document.getElementById('saveEntryBtn').onclick = saveHabitEntry;
-  document.getElementById('clearFormBtn').onclick = clearForm;
-  document.getElementById('deleteEntryBtn').onclick = deleteCurrentEntry;
-  document.getElementById('todayBtn').onclick = async () => { let t = new Date().toISOString().split('T')[0]; dateInput.value = t; await loadHabitForDate(t); };
-  dateInput.onchange = async () => await loadHabitForDate(dateInput.value);
-  wakeTime.oninput = updateDurationDisplay; sleepTime.oninput = updateDurationDisplay;
-  [prayerFajr,prayerDhuhr,prayerAsr,prayerMaghrib,prayerIsha].forEach(cb=>cb.onchange = updatePrayerCount);
-  document.getElementById('loadReportBtn').onclick = showMonthlyReport;
-
-  // Start: check session
-  checkSession();
+  
+  // ========== EVENT LISTENERS ==========
+  loginBtn.addEventListener('click', handleLogin);
+  signupBtn.addEventListener('click', handleSignup);
+  
+  // Allow Enter key to submit
+  authPassword.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleLogin();
+  });
+  authEmail.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleLogin();
+  });
+  
+  // Start: check if already logged in
+  checkExistingSession();
 </script>
 </body>
 </html>

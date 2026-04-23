@@ -1,224 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Habit Compass | Cloud Sync</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <!-- Supabase JS - must load before our script -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    .loading-spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
+<html>
+<head><title>Supabase Test</title></head>
 <body>
-
-<!-- LOGIN SCREEN -->
-<div id="authScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 to-indigo-700 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8">
-    <div class="text-center mb-6">
-      <i class="fas fa-chart-line text-indigo-600 text-4xl mb-2"></i>
-      <h2 class="text-2xl font-bold text-gray-800">Habit Compass</h2>
-      <p class="text-gray-500">Sign in to sync across devices</p>
-    </div>
-    <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Email</label>
-        <input type="email" id="authEmail" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-indigo-500" placeholder="you@example.com" value="shaikhani1996@gmail.com">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Password</label>
-        <input type="password" id="authPassword" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 mt-1 focus:ring-2 focus:ring-indigo-500" placeholder="••••••">
-      </div>
-      <div class="flex gap-3">
-        <button id="loginBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2">
-          <i class="fas fa-sign-in-alt"></i> Login
-        </button>
-        <button id="signupBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2">
-          <i class="fas fa-user-plus"></i> Sign Up
-        </button>
-      </div>
-      <div id="authError" class="text-red-600 text-sm text-center hidden"></div>
-      <p class="text-xs text-gray-400 text-center">Your data is encrypted and private.</p>
-    </div>
-  </div>
-</div>
-
-<!-- MAIN APP (hidden until logged in) -->
-<div id="mainApp" class="hidden p-4 md:p-6 max-w-7xl mx-auto">
-  <div class="text-center py-20 text-gray-500">Loading your dashboard...</div>
-</div>
-
-<script>
-  // ========== SUPABASE CONFIGURATION ==========
-  const SUPABASE_URL = "https://hbxyoyqjwregpwipunwt.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhieHlveXFqd3JlZ3B3aXB1bnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NDczMzgsImV4cCI6MjA5MjUyMzMzOH0.uypKLrJfg-zvWwqddaEgRKjKuZK7BORKKVGbmhZS6cA";
-  
-  // Initialize Supabase client
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  
-  // DOM elements
-  const authScreen = document.getElementById('authScreen');
-  const mainApp = document.getElementById('mainApp');
-  const authEmail = document.getElementById('authEmail');
-  const authPassword = document.getElementById('authPassword');
-  const loginBtn = document.getElementById('loginBtn');
-  const signupBtn = document.getElementById('signupBtn');
-  const authErrorDiv = document.getElementById('authError');
-  
-  // Helper to show error on login screen
-  function showAuthError(message) {
-    authErrorDiv.textContent = message;
-    authErrorDiv.classList.remove('hidden');
-    setTimeout(() => authErrorDiv.classList.add('hidden'), 4000);
-  }
-  
-  // Helper to show loading state on buttons
-  function setButtonLoading(btn, isLoading) {
-    if (isLoading) {
-      btn.disabled = true;
-      btn.classList.add('opacity-70');
-      btn.innerHTML = '<span class="loading-spinner"></span> Loading...';
-    } else {
-      btn.disabled = false;
-      btn.classList.remove('opacity-70');
-      if (btn.id === 'loginBtn') btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
-      else btn.innerHTML = '<i class="fas fa-user-plus"></i> Sign Up';
-    }
-  }
-  
-  // ========== AUTHENTICATION FUNCTIONS ==========
-  async function handleLogin() {
-    const email = authEmail.value.trim();
-    const password = authPassword.value;
-    
-    if (!email || !password) {
-      showAuthError('Please enter email and password');
-      return;
-    }
-    
-    setButtonLoading(loginBtn, true);
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password
-    });
-    
-    setButtonLoading(loginBtn, false);
-    
-    if (error) {
-      console.error('Login error:', error);
-      showAuthError(error.message || 'Login failed. Check credentials.');
-      return;
-    }
-    
-    // Success
-    console.log('Logged in user:', data.user);
-    await loadMainApp();
-  }
-  
-  async function handleSignup() {
-    const email = authEmail.value.trim();
-    const password = authPassword.value;
-    
-    if (!email || !password) {
-      showAuthError('Please enter email and password');
-      return;
-    }
-    if (password.length < 6) {
-      showAuthError('Password must be at least 6 characters');
-      return;
-    }
-    
-    setButtonLoading(signupBtn, true);
-    
-    const { data, error } = await supabase.auth.signUp({
-      email: email,
-      password: password
-    });
-    
-    setButtonLoading(signupBtn, false);
-    
-    if (error) {
-      console.error('Signup error:', error);
-      showAuthError(error.message || 'Signup failed.');
-      return;
-    }
-    
-    if (data.user) {
-      showAuthError('✅ Account created! You can now login.');
-      // Clear password field after signup
-      authPassword.value = '';
-    } else {
-      showAuthError('Signup successful. Please check your email to confirm (or just login if disabled).');
-    }
-  }
-  
-  // ========== CHECK EXISTING SESSION ==========
-  async function checkExistingSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('Session check error:', error);
-      return false;
-    }
-    if (session) {
-      console.log('Existing session found for:', session.user.email);
-      await loadMainApp();
-      return true;
-    }
-    return false;
-  }
-  
-  // ========== LOAD THE ACTUAL HABIT TRACKER (simplified version to prove it works) ==========
-  async function loadMainApp() {
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      // No user, show login screen
-      authScreen.classList.remove('hidden');
-      mainApp.classList.add('hidden');
-      return;
-    }
-    
-    // Show main app with a welcome message
-    mainApp.innerHTML = `
-      <div class="bg-white rounded-2xl shadow-xl p-8 text-center">
-        <i class="fas fa-check-circle text-green-500 text-5xl mb-4"></i>
-        <h2 class="text-2xl font-bold text-gray-800">Welcome, ${user.email}!</h2>
-        <p class="text-gray-600 mt-2">You are successfully logged in.</p>
-        <p class="text-gray-500 text-sm mt-4">The full habit tracker will load here.</p>
-        <button id="logoutBtnMain" class="mt-6 bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-xl transition"><i class="fas fa-sign-out-alt"></i> Logout</button>
-      </div>
-    `;
-    
-    authScreen.classList.add('hidden');
-    mainApp.classList.remove('hidden');
-    
-    // Attach logout button
-    document.getElementById('logoutBtnMain')?.addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      authScreen.classList.remove('hidden');
-      mainApp.classList.add('hidden');
-      mainApp.innerHTML = '<div class="text-center py-20 text-gray-500">Loading your dashboard...</div>';
-    });
-  }
-  
-  // ========== EVENT LISTENERS ==========
-  loginBtn.addEventListener('click', handleLogin);
-  signupBtn.addEventListener('click', handleSignup);
-  
-  // Allow Enter key to submit
-  authPassword.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleLogin();
-  });
-  authEmail.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleLogin();
-  });
-  
-  // Start: check if already logged in
-  checkExistingSession();
-</script>
+    <h1>Testing Supabase Connection</h1>
+    <pre id="output">Waiting...</pre>
+    <script>
+        const SUPABASE_URL = "https://hbxyoyqjwregpwipunwt.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhieHlveXFqd3JlZ3B3aXB1bnd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NDczMzgsImV4cCI6MjA5MjUyMzMzOH0.uypKLrJfg-zvWwqddaEgRKjKuZK7BORKKVGbmhZS6cA";
+        
+        const output = document.getElementById('output');
+        
+        async function test() {
+            output.textContent = "Testing fetch to Supabase...\n";
+            try {
+                // Test 1: Can we reach Supabase?
+                const response = await fetch(SUPABASE_URL + "/rest/v1/", {
+                    headers: {
+                        "apikey": SUPABASE_ANON_KEY
+                    }
+                });
+                output.textContent += "Fetch response status: " + response.status + "\n";
+                if (response.ok) {
+                    output.textContent += "✅ Supabase is reachable!\n";
+                } else {
+                    output.textContent += "❌ Supabase returned error: " + response.status + "\n";
+                }
+            } catch (err) {
+                output.textContent += "❌ Network error: " + err.message + "\n";
+                output.textContent += "This means your browser cannot connect to Supabase at all.\n";
+            }
+        }
+        test();
+    </script>
 </body>
 </html>
